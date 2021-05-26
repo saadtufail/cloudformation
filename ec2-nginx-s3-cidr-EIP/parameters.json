@@ -1,0 +1,44 @@
+[
+{
+  "ParameterKey": "KeyName",
+  "ParameterValue": "cloudformation-user"
+
+},
+{
+  "ParameterKey": "SSHCIDR",
+  "ParameterValue": "0.0.0.0/0"
+
+},
+{
+  "ParameterKey": "InstanceType",
+  "ParameterValue": "t2.micro"
+},
+{
+  "ParameterKey": "homePath",
+  "ParameterValue": "/home/ec2-user/"
+},
+{
+  "ParameterKey": "distFolder",
+  "ParameterValue": "s3_dist"
+},
+{
+  "ParameterKey": "sourceBucket",
+  "ParameterValue": "ai-dashboard-bucket"
+},
+{
+  "ParameterKey": "zipfileName",
+  "ParameterValue": "dist.zip"
+},
+{
+  "ParameterKey": "ExtractedFolderName",
+  "ParameterValue": "dist"
+},
+{
+  "ParameterKey": "destinationFolder",
+  "ParameterValue": "/home/ec2-user/"
+},
+{
+  "ParameterKey": "nginxPath",
+  "ParameterValue": "/usr/share/nginx/html/"
+} 
+]

@@ -1,0 +1,17 @@
+[
+{
+  "ParameterKey": "KeyName",
+  "ParameterValue": "cloudformation-user"
+
+},
+{
+  "ParameterKey": "SSHCIDR",
+  "ParameterValue": "0.0.0.0/0"
+
+},
+{
+  "ParameterKey": "InstanceType",
+  "ParameterValue": "t2.micro"
+
+}  
+]

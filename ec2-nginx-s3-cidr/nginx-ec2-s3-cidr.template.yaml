@@ -1,0 +1,176 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create an Amazon Linux server running nginx web server
+ 
+Parameters:
+    KeyName:
+        Default: cloudformation-user
+        Type: AWS::EC2::KeyPair::KeyName
+        Description: Name of an existing EC2 keypair to enable SSH access to the instance
+    SSHCIDR:
+        Type: String
+        Description: The CIDR block restricting SSH
+        MinLength: 0
+        Default: 0.0.0.0/0
+        AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+        ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x
+    
+Mappings:
+    Region2AMI:
+        us-east-1:
+            AMI: ami-00514a528eadbc95b
+        us-east-2: 
+            AMI: ami-04fcd96153cb57194
+        us-west-1:
+            AMI: ami-023e0c35fc414e78b
+        us-west-2:
+            AMI: ami-0528a5175983e7f28
+            
+Resources: 
+    EC2Instance:
+        Type: AWS::EC2::Instance
+        Metadata:
+            AWS::CloudFormation::Init:
+                configSets:
+                    InstallAndConfig:
+                        - Install
+                Install:
+                    packages:
+                        yum:
+                            git          : [] 
+                            nginx        : []
+                            gcc-c++      : []
+                            pcre-devel   : []
+                            zlib-devel   : []
+                            make         : []
+                            gd           : []
+                            gd-devel     : []
+                            openssl      : []
+                            openssl-devel: []
+                    files:
+                       /usr/share/nginx/index.html:
+                        content: !
+                            "<title>My name</title><h1>My name</h1>"
+                        mode: '000644'
+                        owner: root
+                        group: root
+                        
+                        /etc/cfn/cfn-hup.conf:
+                            content: !Sub |
+                                [main]
+                                stack=${AWS::StackId}
+                                region=${AWS::Region}
+                                interval=1
+                        mode: '000400'
+                        owner: root
+                        group: root
+                        
+                        /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+                            content: !Sub |
+                                [cfn-auto-reloader-hook]
+                                triggers=post.update
+                                path=Resources.Amazon Linux w/ nginx included.Metadata.AWS::CloudFormation::Init
+                                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region} --configsets InstallAndConfig
+                                runas=root
+                        mode: '00400'
+                        owner: root
+                        group: root
+                    
+                    services:
+                        sysvinit:
+                            nginx:
+                                enabled: 'true'
+                                ensureRunning: 'true'
+                                files:
+                                    - "/usr/share/nginx/index.html"
+                                sources:
+                                    - "/etc/nginx/nginx.conf"
+                            cfn-hup:
+                                enabled: 'true'
+                                ensureRunning: 'true'
+                                files:
+                                    - /etc/cfn/cfn-hup.conf
+                                    - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+        
+        Properties:
+            IamInstanceProfile: !Ref 'ListS3BucketsInstanceProfile'
+            ImageId: !FindInMap [Region2AMI, !Ref 'AWS::Region', 'AMI']
+            InstanceType: t2.micro
+            SecurityGroups: 
+            - !Ref WebserverSecurityGroup
+            Tags:
+            - Key: Name
+              Value: Amazon Linux w/ nginx and s3. 
+            KeyName: !Ref KeyName  
+            UserData:
+                'Fn::Base64':
+                  !Sub |
+                    #!/bin/bash -x
+                    yum update -y aws-cfn-bootstrap
+                    sudo yum install git -y
+                    sudo yum update -y
+                    sudo yum install nginx -y
+                    sudo service nginx enable
+                    sudo service nginx start
+                    cd /home/ec2-user/
+                    mkdir s3_dist
+                    aws s3 cp s3://ai-dashboard-bucket/dist.zip /home/ec2-user/
+                    cd /home/ec2-user/s3_dist
+                    cp ../dist.zip /home/ec2-user/s3_dist
+                    unzip dist.zip
+                    cd /usr/share/nginx/html/
+                    rm -rf *
+                    cp -R /home/ec2-user/s3_dist/dist /usr/share/nginx/html/
+                    cd /usr/share/nginx/html/dist/
+                    mv * ../
+                    sudo service nginx restart
+                    /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region}  --configSets InstallAndConfig
+
+    ListS3BucketsInstanceProfile:
+        Type: AWS::IAM::InstanceProfile
+        Properties: 
+            Path: /
+            Roles: 
+              -  !Ref 'ListS3BucketsRole'
+
+    ListS3BucketsPolicy:
+        Type: AWS::IAM::Policy
+        Properties: 
+            PolicyName: ListS3BucketsPolicy
+            PolicyDocument: 
+                Statement:
+                    Effect: Allow
+                    Action: [s3:Get*, s3:List*]
+                    Resource: '*'
+            Roles:
+              -  !Ref 'ListS3BucketsRole'
+
+    ListS3BucketsRole:
+        Type: AWS::IAM::Role
+        Properties: 
+            AssumeRolePolicyDocument:
+                Statement: 
+                    Effect: Allow
+                    Principal:
+                        Service: ec2.amazonaws.com
+                    Action: sts:AssumeRole
+            Path: /
+
+    WebserverSecurityGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+            GroupDescription: Allows HTTP,SSH Access from anywhere.
+            SecurityGroupIngress:
+            - CidrIp: 0.0.0.0/0
+              FromPort: 80
+              ToPort: 80
+              IpProtocol: tcp
+            - CidrIp: !Ref SSHCIDR
+              FromPort: 22
+              ToPort: 22
+              IpProtocol: tcp
+        
+Outputs:
+    WebURL:
+        Description: URL for web page
+        Value: !Sub 'http://${EC2Instance.PublicIp}'

@@ -1,0 +1,3 @@
+aws cloudformation create-stack --template-body file://nginx-ec2-s3-cidr-parameter.template.yaml --stack-name nginx-aws-s3-CIDR --parameters file://parameters.json --capabilities CAPABILITY_IAM
+
+
